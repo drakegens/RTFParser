@@ -10,181 +10,94 @@ namespace RTFParser
 {
     public static class RTFParser
     {
-
-        //public static string ParseRTFToPlainTextWithWinTextForm(string rtf)
-        //{
-
-        //}
-
-        public static string ParseRTFToPlainText(string rtf)
+        
+        public static string ParseRTFToPlaintext(string rtf)
         {
-
-            Stack<string> state = new Stack<string>();
             StringBuilder result = new StringBuilder();
+            var regularExpression = @"\\[a-z]+(-?[0-9]+)? ?";
+            string command = string.Empty;
+            string tempCommand = string.Empty;
             var inCommand = false;
-            var inEscape = false;
-            var inGroup = false;
-            StringBuilder command = new StringBuilder();
+            var inSpecialGroup = false;
+            var inExtensibleRTF = false;
+            Stack<string> commands = new Stack<string>();
 
-
-            //for validation
-            //var richTextBox = new RichTextBox();
-            //richTextBox.Rtf = "";
-            //var rtfText = string.Join("\r\n", richTextBox.Lines);
-
-            //get rid of control words, control symbols, and groups
-            for(int i = 0; i < rtf.Length; i++)
+            for (int i = 1; i < rtf.Length; i++)
             {
+                inSpecialGroup = determineIfInSpecialGroup(commands);
                 char character = rtf.ElementAt(i);
-                if (!inCommand && !inEscape && !inGroup)
+                if (!inCommand && !inSpecialGroup && !inExtensibleRTF)
                 {
                     switch (character)
                     {
                         case '\\':
-                            if (Regex.IsMatch((character + rtf.ElementAt(i + 1).ToString()), "/\\[a-z]+(-?[0-9]+)? ?/"))
+                            if (Regex.IsMatch((character + rtf.ElementAt(i + 1).ToString()), regularExpression))
                             {
                                 inCommand = true;
+                                command += character;
+                            }
+                            else if (rtf.ElementAt(i + 1) == '*')
+                            {
+                                inExtensibleRTF = true;  
                             }
                             else
                             {
-                                inEscape = true;
-                                //it's an escaped character
+                                //inescape
+                                //handle special cases of escapes too
                             }
-
                             break;
-                        case '{'://beginning of group
-                            inGroup = true;
+                        case '{':
                             break;
-
-
+                        case '}':
+                            break;
                         default:
+                            //if most recent command is a \fonttbl or \colortbl or \*\command construct... ignore until i hit a }
                             result.Append(character);
                             break;
-                            //in a command or an escaped character
-
                     }
                 }
                 else if (inCommand)
                 {
+                        command += character;
+                        tempCommand = Regex.Replace(command, regularExpression, "");
 
-                    //here is the regex: /\\[a-z]+(-?[0-9]+)? ?/
-                    inCommand = Regex.IsMatch(command.ToString(), "/\\[a-z]+(-?[0-9]+)? ?/");
-
-                    //check against regular expression to determine if I can flip inCommand to off
+                        if (tempCommand.Length > 0)
+                        {
+                            inCommand = false;
+                            commands.Push(command.Substring(0, command.Length - 1));
+                            command = string.Empty;
+                            i--;
+                        }
                 }
-                else if (inEscape)
-                {
-                    //There are only three escapes that are of general interest: \~ is the escape that indicates a nonbreaking space; \- is an optional hyphen(a.k.a.a hyphenation point); and \_ is a nonbreaking hyphen(that is, a hyphen that that’s not safe for breaking the line after).
-                    switch (character)
-                    {
-                        case '\'':
-                            //get the next two characters
-                            char[] chars = { rtf.ElementAt(i + 1), rtf.ElementAt(i + 2) };
-                            
-                            result.Append(DecodeHex(new string(chars)));
-                            inEscape = false;
-                            i = i + 3;
-                            break;
-                        //case '~':
-                        //    result.Append("~");
-                        //    break;
-                        //case '-':
-                        //    result.Append("-");
-                        //    break;
-                        //case '_':
-                        //    result.Append("_");
-                        //    break;
-                        //case '*':
-                        //    break;
-                        default:
-                            result.Append(character);
-                            inEscape = false;
-                            i = i + 2;
-                            break;
-
-
-                    }
-                }
-                else if (inGroup)
+                else if (inSpecialGroup)
                 {
                     if(character == '}')
                     {
-                        inGroup = false;
+                        inSpecialGroup = false;
+                        commands.Pop();
                     }
-
+                }
+                else if (inExtensibleRTF)
+                {
+                    if (character == '}')
+                    {
+                        inExtensibleRTF = false;
+                    }
                 }
             }
-
-
             return result.ToString();
-
         }
 
-        public static string DecodeHex(string hex)
+        private static bool determineIfInSpecialGroup(Stack<string> commands)
         {
-            string result = string.Empty;
-            for (int i = 0; i < hex.Length; i += 2)
-            {
-                
-               string hs = hex.Substring(i, 2);
-                uint decval = System.Convert.ToUInt32(hs, 16);
-                char character = System.Convert.ToChar(decval);
-                result += character;
+            if (commands.Count > 0) { 
+            if (commands.Peek() == "\\fonttbl" || commands.Peek() == "\\colortbl") {
 
+                return true;
             }
-
-            return result;
-
-        }
-
-        private static void ApplyStateToPlainText(string state)
-        {
-
-        }
-
-        private static void TakeActionOnPlainTextViaControlAndParameters(string controlAction, List<string> parameters)
-        {
-
-        }
-
-        private static string ExtractPlainTextFromGroup(string group)
-        {
-            return "";
-        }
-
-        private static string DetermineEscapedCharacter(string escapedCharacter)
-        {
-            return "";
-        }
-
-        private static string GetCodePage(int value)
-        {
-            switch (value)
-            {
-                case 437:
-                    return "United States IBM";
-                    break;
-                case 708:
-                    return "Arabic (ASMO 708)";
-                    break;
-                case 709:
-                    return "Arabic (ASMO 449+, BCON V4";
-                    break;
-                case 710:
-                    return "Arabic (transparent Arabic)";
-                    break;
-                case 711:
-                    return "Arabic (Nafitha Enhanced";
-                    break;
-                case 720:
-                    return "";
-                    break;
-                default:
-                    return "";
-                    break;
             }
+            return false;
         }
-
 
     }
 }

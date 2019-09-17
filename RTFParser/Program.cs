@@ -18,7 +18,7 @@ namespace RTFParser
 
             Debug.WriteLine("RTF File: " + rtfResult);
 
-            string plainTextResult = RTFParser.ParseRTFToPlainText(rtfResult);
+            string plainTextResult = RTFParser.ParseRTFToPlaintext(rtfResult);
 
             Debug.WriteLine("Result: " + plainTextResult);
 
